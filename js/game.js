@@ -1,6 +1,6 @@
-var createRenderer, createAngryBird, createPlanks;
+var game, createRenderer, createAngryBird, createPlanks, createPigs;
 
-createRenderer = function (Physics, width, height) {
+createRenderer = function (width, height) {
   return Physics.renderer('canvas', {
     el: 'my-game',
     width: width,
@@ -17,9 +17,10 @@ createRenderer = function (Physics, width, height) {
   });
 };
 
-createAngryBird = function (Physics) {
-  //angry_bird = Physics.body('circle', { x: 80, y: 100, vx: 0.65, vy: 0.4, radius: 25 });
-  angry_bird = Physics.body('circle', { x: 80, y: 600, vx: 0, vy: 0, radius: 25 });
+createAngryBird = function (screenWidth, screenHeight) {
+  var angry_bird;
+
+  angry_bird = Physics.body('circle', { x: 80, y: screenHeight - 25, vx: 0, vy: 0, radius: 25 });
 
   angry_bird.view = new Image();
   angry_bird.view.src = './images/angry_bird_50x50.png';
@@ -27,20 +28,16 @@ createAngryBird = function (Physics) {
   return angry_bird;
 };
 
-createPlanks = function (Physics, screenWidth, screenHeight) {
-  var plankConfigurations, hwidth, hheight, vwidth, vheight;
-
-  hwidth = vheight = 10;
-  hheight = 50;
-  vwidth = 150;
+createPlanks = function (screenWidth, screenHeight) {
+  var plankConfigurations;
 
   plankConfigurations = [
-    { x: screenWidth/2, y: screenHeight, width: hwidth, height: hheight, vx: 0, vy: 0},
-    { x: screenWidth/2 + 25, y: screenHeight - 70, width: hwidth, height: hheight, vx: 0, vy: 0 },
-    { x: screenWidth/2 + 75, y: screenHeight - 70, width: hwidth, height: hheight, vx: 0, vy: 0 },
-    { x: screenWidth/2 + 100, y: screenHeight, width: hwidth, height: hheight, vx: 0, vy: 0 },
-    { x: screenWidth/2 + 50, y: screenHeight - 50, width: vwidth, height: vheight, vx: 0, vy: 0 },
-    { x: screenWidth/2 + 50, y: screenHeight - 80, width: 100, height: vheight, vx: 0, vy: 0 }
+    { x: screenWidth/2, y: screenHeight - 25, width: 10, height: 50, vx: 0, vy: 0},
+    { x: screenWidth/2 + 100, y: screenHeight - 25, width: 10, height: 50, vx: 0, vy: 0 },
+    { x: screenWidth/2 + 50, y: screenHeight - 55, width: 150, height: 10, vx: 0, vy: 0 },
+    { x: screenWidth/2 + 20, y: screenHeight - 85, width: 10, height: 50, vx: 0, vy: 0 },
+    { x: screenWidth/2 + 80, y: screenHeight - 85, width: 10, height: 50, vx: 0, vy: 0 },
+    { x: screenWidth/2 + 50, y: screenHeight - 115, width: 100, height: 10, vx: 0, vy: 0 }
   ];
 
   return plankConfigurations.map(function (plankConfig) {
@@ -48,12 +45,12 @@ createPlanks = function (Physics, screenWidth, screenHeight) {
   });
 }
 
-createPigs = function (Physics, screenWidth, screenHeight) {
+createPigs = function (screenWidth, screenHeight) {
   var pigConfigurations;
 
   pigConfigurations = [
-    { x: screenWidth/2 + 50, y: screenHeight - 70, vx: 0, vy: 0, radius: 25 },
-    { x: screenWidth/2 + 50, y: screenHeight - 140, vx: 0, vy: 0, radius: 25 }
+    { x: screenWidth/2 + 50, y: screenHeight - 85, vx: 0, vy: 0, radius: 25 },
+    { x: screenWidth/2 + 50, y: screenHeight - 145, vx: 0, vy: 0, radius: 25 }
   ];
 
   return pigConfigurations.map(function (pigConf) {
@@ -67,53 +64,71 @@ createPigs = function (Physics, screenWidth, screenHeight) {
   });
 };
 
-Physics(function(world) {
-  var width, height, planks;
+game = function (world) {
+  var screenWidth, screenHeight;
 
-  width = window.innerWidth;
-  height = window.innerHeight/2;
+  // Get the dimensions of the screen
+  screenWidth = window.innerWidth;
+  screenHeight = window.innerHeight/2;
 
-  //Setup the rendering process
-  world.add(createRenderer(Physics, width, height));
+  // Setup the rendering process
+  world.add(createRenderer(screenWidth, screenHeight));
+
+  // On every step of the world, render the new state of the world
   world.on('step', function () {
     world.render();
   });
 
-  //Add bodies
-  angry_bird = createAngryBird(Physics);
+  // Add an angry bird
+  angry_bird = createAngryBird(screenWidth, screenHeight);
   world.add(angry_bird);
-  createPlanks(Physics, width, height).forEach(function (plank) {
+
+  // Add the planks
+  createPlanks(screenWidth, screenHeight).forEach(function (plank) {
     world.add(plank);
   });
 
-  createPigs(Physics, width, height).forEach(function (pig) {
+  // Add the pigs
+  createPigs(screenWidth, screenHeight).forEach(function (pig) {
     world.add(pig);
   });
 
+  // Add behaviors (rules according to which bodies in the world act)
+
+  // Add collision detection between bodies and edges of the world
   world.add(
     Physics.behavior('edge-collision-detection', {
-      aabb: Physics.aabb(0, 0, width, height),
+      aabb: Physics.aabb(0, 0, screenWidth, screenHeight),
       restitution: 0.4,
       cof: 0.99
     })
   );
 
+  // Add acceleration
   world.add(Physics.behavior('constant-acceleration'));
 
+  // Add collision detection between bodies
   world.add(Physics.behavior('body-collision-detection'));
 
-  world.add( Physics.behavior('sweep-prune') );
+  // Optimal algorithm for collision detection
+  world.add(Physics.behavior('sweep-prune'));
 
+  // Add responses to collisions
   world.add(Physics.behavior('body-impulse-response'));
 
+  // Make the angry bird grab-able and throw-able
   world.add(Physics.behavior('interactive', {
     el: 'my-game',
-    maxVel: {x: 1, y: -2}
+    maxVel: {x: 1, y: -2} //constraining the horizontal and vertical velocities
   }).applyTo([angry_bird]));
 
+  //Call the step function at regular intervals
   Physics.util.ticker.on(function (time) {
     world.step(time);
   });
 
+  //Start the game
   Physics.util.ticker.start();
-});
+};
+
+Physics(game);
